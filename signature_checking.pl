@@ -1,5 +1,4 @@
 % TODO:
-% - fix failure termination/error handling
 % - refine cascading
 % - multiple input gates and hooks
 % - implement "or" syntax
@@ -124,7 +123,7 @@ verify_types(Explored, UpstreamTypes) :-
 	signatures(Module, _, OutputSigs),
 	initialize_upstream_types(Module, 0, OutputSigs, RestUpstreamTypes),
 	append(UpstreamTypes, RestUpstreamTypes, NewUpstreamTypes),
-	verify_types([Module | Explored], NewUpstreamTypes).
+	verify_types([Module | Explored], NewUpstreamTypes), !.
 verify_types(Explored, UpstreamTypes) :-
 	connected(_, _, Module, _),
 	foreach(connected(Parent, _, Module, _),
@@ -134,7 +133,7 @@ verify_types(Explored, UpstreamTypes) :-
 	module_type_satisfied(Module, UpstreamTypes, InputType),
 	update_upstream_types(Module, 0, InputType, OutputSigs, UpstreamTypes, UpstreamTypesRest),
 	append(UpstreamTypes, UpstreamTypesRest, NewUpstreamTypes),
-	verify_types([Module | Explored], NewUpstreamTypes).
+	verify_types([Module | Explored], NewUpstreamTypes), !.
 
 % ------------------- Protocol Attribute Checking --------------------------
 
@@ -183,7 +182,7 @@ verify_prot_attributes(Explored, UpstreamAttrs) :-
 	signatures(Module, _, OutputSigs),
 	initialize_prot_attributes(Module, 0, OutputSigs, RestUpstreamAttrs),
 	append(UpstreamAttrs, RestUpstreamAttrs, NewUpstreamAttrs),
-	verify_prot_attributes([Module | Explored], NewUpstreamAttrs).
+	verify_prot_attributes([Module | Explored], NewUpstreamAttrs), !.
 verify_prot_attributes(Explored, UpstreamAttrs) :-
 	connected(_, _, Module, _),
 	foreach(connected(Parent, _, Module, _),
@@ -194,7 +193,7 @@ verify_prot_attributes(Explored, UpstreamAttrs) :-
 	module_prot_attrs_satisfied(Module, InputAttrs, UpstreamAttrs),
 	update_prot_attrs(Module, 0, InputAttrs, OutputSigs, UpstreamAttrs, RestUpstreamAttrs),
 	append(UpstreamAttrs, RestUpstreamAttrs, NewUpstreamAttrs),
-	verify_prot_attributes([Module | Explored], NewUpstreamAttrs).
+	verify_prot_attributes([Module | Explored], NewUpstreamAttrs), !.
 
 
 % ------------------- Agnostic Attribute Checking -------------------
@@ -239,7 +238,7 @@ verify_agnostic_attributes(Explored, UpstreamAttrs) :-
 	signatures(Module, _, OutputSigs),
 	initialize_agnostic_attrs(Module, 0, OutputSigs, RestUpstreamAttrs),
 	append(UpstreamAttrs, RestUpstreamAttrs, NewUpstreamAttrs),
-	verify_agnostic_attributes([Module | Explored], NewUpstreamAttrs).
+	verify_agnostic_attributes([Module | Explored], NewUpstreamAttrs), !.
 verify_agnostic_attributes(Explored, UpstreamAttrs) :-
 	connected(_, _, Module, _),
 	foreach(connected(Parent, _, Module, _),
@@ -249,7 +248,7 @@ verify_agnostic_attributes(Explored, UpstreamAttrs) :-
 	module_agnostic_attrs_satisfied(Module, InputAttrs, UpstreamAttrs),
 	update_agnostic_attrs(Module, 0, InputAttrs, OutputSigs, UpstreamAttrs, RestUpstreamAttrs),
 	append(UpstreamAttrs, RestUpstreamAttrs, NewUpstreamAttrs),
-	verify_agnostic_attributes([Module | Explored], NewUpstreamAttrs).
+	verify_agnostic_attributes([Module | Explored], NewUpstreamAttrs), !.
 
 % ------------------- Framework Entry Point -------------------------
 
