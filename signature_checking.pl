@@ -1,5 +1,5 @@
 % TODO:
-% - refine cascading
+% - refine cascading:
 % - multiple input gates and hooks
 % - implement "or" syntax
 
@@ -34,20 +34,19 @@ flatten(Protocols, FlatProtocols) :-
 	flatten(Rest, RestFlat),
 	FlatProtocols = [Prot | RestFlat].
 
-% takes a list of protocols/protocol-attributes 
-% and converts it into a list of (protocol-attribute) pairs
-get_protocol_attrs([], []).
-get_protocol_attrs([X], []) :-
-	var(X).
-get_protocol_attrs(Protocols, Attrs) :-
-	Protocols = [Prot | ProtRest],
-	atom(Prot),
-	get_protocol_attrs(ProtRest, Attrs).
-get_protocol_attrs(Protocols, Attrs) :-
-	Protocols = [ProtFirst | ProtRest],
-	ProtFirst = _-_,
-	get_protocol_attrs(ProtRest, RestAttrs),
-	Attrs = [ProtFirst | RestAttrs].
+contains_var(Lst) :-
+	Lst = [First | _],
+	var(First).
+contains_var(Lst) :-
+	Lst = [_ | Rest],
+	contains_var(Rest).
+
+remove_tail(Lst, []) :-
+	Lst = [_].
+remove_tail(Lst, NewLst) :-
+	Lst = [First | Rest],
+	remove_tail(Rest, NewLstRest),
+	NewLst = [First | NewLstRest].
 
 
 % ===================== PIPELINE TRAVERSAL ==========================
@@ -135,6 +134,54 @@ verify_types(Explored, UpstreamTypes) :-
 	append(UpstreamTypes, UpstreamTypesRest, NewUpstreamTypes),
 	verify_types([Module | Explored], NewUpstreamTypes), !.
 
+
+% ------------------- Generic Attribute Rules ------------------------------
+
+% takes a list of protocols/protocol-attributes 
+% and converts it into a list of (protocol-attribute) pairs
+get_protocol_attrs([], []).
+get_protocol_attrs([X], []) :-
+	var(X).
+get_protocol_attrs(Protocols, Attrs) :-
+	Protocols = [Prot | ProtRest],
+	atom(Prot),
+	get_protocol_attrs(ProtRest, Attrs).
+get_protocol_attrs(Protocols, Attrs) :-
+	Protocols = [ProtFirst | ProtRest],
+	ProtFirst = _-_,
+	get_protocol_attrs(ProtRest, RestAttrs),
+	Attrs = [ProtFirst | RestAttrs].
+
+flatten_protocol_attrs([], []).
+flatten_protocol_attrs([X], []) :-
+	var(X).
+flatten_protocol_attrs(Protocols, Attrs) :-
+	Protocols = [Prot | ProtRest],
+	atom(Prot),
+	flatten_protocol_attrs(ProtRest, Attrs).
+flatten_protocol_attrs(Protocols, Attrs) :-
+	Protocols = [ProtFirst | ProtRest],
+	ProtFirst = _-[],
+	flatten_protocol_attrs(ProtRest, Attrs).
+flatten_protocol_attrs(Protocols, Attrs) :-
+	Protocols = [ProtFirst | ProtRest],
+	ProtFirst = Prot-[ProtAttr | ProtAttrsRest],
+	flatten_protocol_attrs([Prot-ProtAttrsRest | ProtRest], RestAttrs),
+	Attrs = [Prot-ProtAttr | RestAttrs].
+
+cascaded_attrs([], _, []).
+cascaded_attrs(InputAttrs, OutputAttrs, CascadedAttrs) :-
+	InputAttrs = [InputAttr | InputAttrRest],
+	InputAttr = [].
+	%not(memberchk())
+
+attribute_cascade(InputAttrs, OutputAttrs, NewOutputAttrs) :-
+	contains_var(OutputAttrs),
+	remove_tail(OutputAttrs, NoncascadedAttrs),
+	cascaded_attrs(InputAttrs, OutputAttrs, CascadedAttrs),
+	append(NoncascadedAttrs, CascadedAttrs, NewOutputAttrs).
+attribute_cascade(_, Attrs, Attrs).
+
 % ------------------- Protocol Attribute Checking --------------------------
 
 initialize_prot_attributes(_, _, [], []).
@@ -152,6 +199,8 @@ prot_attr_compatible(Prot, Attr, UpstreamAttrs) :-
     compatible(Prot, AttrName, UpstreamAttrValue, AttrValue).
 
 prot_attrs_compatible([], _).
+prot_attrs_compatible([Attrs], _) :-
+	var(Attrs).
 prot_attrs_compatible(Attrs, UpstreamAttrs) :-
     Attrs = [Prot-ProtAttrs | AttrsRest],
     memberchk(Prot-UpstreamProtAttrs, UpstreamAttrs),
@@ -168,6 +217,7 @@ update_prot_attrs(_, _, _, [], _, _).
 update_prot_attrs(Module, Ogate, InputAttrs, OutputSigs, UpstreamProtAttrs, NewUpstreamProtAttrs) :-
 	OutputSigs = [(OutputType, _) | OutputSigsRest],
 	get_protocol_attrs(OutputType, OutputAttrs),
+	%attribute_cascade(InputAttrs, OutputAttrsUnverified, OutputAttrs),
 	NewOgate is Ogate + 1,
 	update_prot_attrs(Module, NewOgate, InputAttrs, OutputSigsRest, UpstreamProtAttrs, NewUpstreamProtAttrsRest),
 	NewUpstreamProtAttrs = [(Module, Ogate, OutputAttrs) | NewUpstreamProtAttrsRest].
@@ -190,6 +240,9 @@ verify_prot_attributes(Explored, UpstreamAttrs) :-
 	not(memberchk(Module, Explored)), 
 	signatures(Module, [(InputType, _) | _], OutputSigs),
 	get_protocol_attrs(InputType, InputAttrs),
+	flatten_protocol_attrs(InputType, X),
+	print(X),
+	nl,
 	module_prot_attrs_satisfied(Module, InputAttrs, UpstreamAttrs),
 	update_prot_attrs(Module, 0, InputAttrs, OutputSigs, UpstreamAttrs, RestUpstreamAttrs),
 	append(UpstreamAttrs, RestUpstreamAttrs, NewUpstreamAttrs),
@@ -211,7 +264,8 @@ agnostic_attr_compatible(Attr, UpstreamAttrs) :-
 	memberchk(AttrName-UpstreamAttrValue, UpstreamAttrs),
 	compatible(agnostic, AttrName, UpstreamAttrValue, AttrValue).
 
-agnostic_attrs_compatible(_, []).
+agnostic_attrs_compatible([Attrs], _) :-
+	var(Attrs).
 agnostic_attrs_compatible(Attrs, UpstreamAttrs) :-
 	foreach( (member(Attr, Attrs)), agnostic_attr_compatible(Attr, UpstreamAttrs)).
 
@@ -225,7 +279,7 @@ update_agnostic_attrs(_, _, _, [], _, _).
 update_agnostic_attrs(Module, Ogate, InputAttrs, OutputSigs, UpstreamAttrs, NewUpstreamAttrs) :-
 	OutputSigs = [(_, OutputAttrs) | OutputSigsRest],
 	NewOgate is Ogate + 1,
-	update_prot_attrs(Module, NewOgate, InputAttrs, OutputSigsRest, UpstreamAttrs, NewUpstreamAttrsRest),
+	update_agnostic_attrs(Module, NewOgate, InputAttrs, OutputSigsRest, UpstreamAttrs, NewUpstreamAttrsRest),
 	NewUpstreamAttrs = [(Module, Ogate, OutputAttrs) | NewUpstreamAttrsRest].
 
 verify_agnostic_attributes(Explored, _) :-
