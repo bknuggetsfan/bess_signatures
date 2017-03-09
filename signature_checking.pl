@@ -139,19 +139,6 @@ verify_types(Explored, UpstreamTypes) :-
 
 % takes a list of protocols/protocol-attributes 
 % and converts it into a list of (protocol-attribute) pairs
-get_protocol_attrs([], []).
-get_protocol_attrs([X], []) :-
-	var(X).
-get_protocol_attrs(Protocols, Attrs) :-
-	Protocols = [Prot | ProtRest],
-	atom(Prot),
-	get_protocol_attrs(ProtRest, Attrs).
-get_protocol_attrs(Protocols, Attrs) :-
-	Protocols = [ProtFirst | ProtRest],
-	ProtFirst = _-_,
-	get_protocol_attrs(ProtRest, RestAttrs),
-	Attrs = [ProtFirst | RestAttrs].
-
 flatten_protocol_attrs([], []).
 flatten_protocol_attrs([X], []) :-
 	var(X).
@@ -169,19 +156,6 @@ flatten_protocol_attrs(Protocols, Attrs) :-
 	ProtAttr = Name-Val,
 	flatten_protocol_attrs([Prot-ProtAttrsRest | ProtRest], RestAttrs),
 	Attrs = [(Prot,Name,Val) | RestAttrs].
-
-cascaded_attrs([], _, []).
-cascaded_attrs(InputAttrs, OutputAttrs, CascadedAttrs) :-
-	InputAttrs = [InputAttr | InputAttrRest],
-	InputAttr = [].
-	%not(memberchk())
-
-attribute_cascade(InputAttrs, OutputAttrs, NewOutputAttrs) :-
-	contains_var(OutputAttrs),
-	remove_tail(OutputAttrs, NoncascadedAttrs),
-	cascaded_attrs(InputAttrs, OutputAttrs, CascadedAttrs),
-	append(NoncascadedAttrs, CascadedAttrs, NewOutputAttrs).
-attribute_cascade(_, Attrs, Attrs).
 
 % ------------------- Protocol Attribute Checking --------------------------
 
@@ -218,7 +192,6 @@ update_prot_attrs(_, _, _, [], _, _).
 update_prot_attrs(Module, Ogate, InputAttrs, OutputSigs, UpstreamProtAttrs, NewUpstreamProtAttrs) :-
 	OutputSigs = [(OutputType, _) | OutputSigsRest],
 	flatten_protocol_attrs(OutputType, OutputAttrs),
-	%attribute_cascade(InputAttrs, OutputAttrsUnverified, OutputAttrs),
 	NewOgate is Ogate + 1,
 	update_prot_attrs(Module, NewOgate, InputAttrs, OutputSigsRest, UpstreamProtAttrs, NewUpstreamProtAttrsRest),
 	NewUpstreamProtAttrs = [(Module, Ogate, OutputAttrs) | NewUpstreamProtAttrsRest].
