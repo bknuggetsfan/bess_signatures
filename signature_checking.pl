@@ -166,8 +166,9 @@ flatten_protocol_attrs(Protocols, Attrs) :-
 flatten_protocol_attrs(Protocols, Attrs) :-
 	Protocols = [ProtFirst | ProtRest],
 	ProtFirst = Prot-[ProtAttr | ProtAttrsRest],
+	ProtAttr = Name-Val,
 	flatten_protocol_attrs([Prot-ProtAttrsRest | ProtRest], RestAttrs),
-	Attrs = [Prot-ProtAttr | RestAttrs].
+	Attrs = [(Prot,Name,Val) | RestAttrs].
 
 cascaded_attrs([], _, []).
 cascaded_attrs(InputAttrs, OutputAttrs, CascadedAttrs) :-
@@ -188,7 +189,7 @@ initialize_prot_attributes(_, _, [], []).
 initialize_prot_attributes(Module, Ogate, OutputSigs, NewAttrs) :-
     OutputSigs = [OutputSig | RestOutputSigs],
     OutputSig = (OutputType, _),
-    get_protocol_attrs(OutputType, OutputAttrs),
+    flatten_protocol_attrs(OutputType, OutputAttrs),
     NewOgate is Ogate + 1,
     initialize_prot_attributes(Module, NewOgate, RestOutputSigs, RestAttrs),
     NewAttrs = [ (Module, Ogate, OutputAttrs) | RestAttrs].
@@ -202,9 +203,9 @@ prot_attrs_compatible([], _).
 prot_attrs_compatible([Attrs], _) :-
 	var(Attrs).
 prot_attrs_compatible(Attrs, UpstreamAttrs) :-
-    Attrs = [Prot-ProtAttrs | AttrsRest],
-    memberchk(Prot-UpstreamProtAttrs, UpstreamAttrs),
-    foreach( (member(ProtAttr, ProtAttrs)), prot_attr_compatible(Prot, ProtAttr, UpstreamProtAttrs) ),
+    Attrs = [(Prot,ProtAttrName, ProtAttrValue) | AttrsRest],
+    member((Prot, ProtAttrName, UpstreamProtAttrValue), UpstreamAttrs),
+    compatible(Prot, ProtAttrName, UpstreamProtAttrValue, ProtAttrValue),
     prot_attrs_compatible(AttrsRest, UpstreamAttrs).
 
 module_prot_attrs_satisfied(_, [], _).
@@ -216,7 +217,7 @@ module_prot_attrs_satisfied(Module, Attrs, UpstreamAttrs) :-
 update_prot_attrs(_, _, _, [], _, _).
 update_prot_attrs(Module, Ogate, InputAttrs, OutputSigs, UpstreamProtAttrs, NewUpstreamProtAttrs) :-
 	OutputSigs = [(OutputType, _) | OutputSigsRest],
-	get_protocol_attrs(OutputType, OutputAttrs),
+	flatten_protocol_attrs(OutputType, OutputAttrs),
 	%attribute_cascade(InputAttrs, OutputAttrsUnverified, OutputAttrs),
 	NewOgate is Ogate + 1,
 	update_prot_attrs(Module, NewOgate, InputAttrs, OutputSigsRest, UpstreamProtAttrs, NewUpstreamProtAttrsRest),
@@ -239,10 +240,8 @@ verify_prot_attributes(Explored, UpstreamAttrs) :-
 			memberchk(Parent, Explored) ),
 	not(memberchk(Module, Explored)), 
 	signatures(Module, [(InputType, _) | _], OutputSigs),
-	get_protocol_attrs(InputType, InputAttrs),
-	flatten_protocol_attrs(InputType, X),
-	print(X),
-	nl,
+	flatten_protocol_attrs(InputType, InputAttrs),
+
 	module_prot_attrs_satisfied(Module, InputAttrs, UpstreamAttrs),
 	update_prot_attrs(Module, 0, InputAttrs, OutputSigs, UpstreamAttrs, RestUpstreamAttrs),
 	append(UpstreamAttrs, RestUpstreamAttrs, NewUpstreamAttrs),
