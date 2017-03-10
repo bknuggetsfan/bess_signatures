@@ -38,6 +38,7 @@ remove_tail(Lst, NewLst) :-
 % ===================== PIPELINE TRAVERSAL ==========================
 
 
+
 % ------------------------ Type Rules -------------------------------
 
 % Takes protocols and strips offs protocol attrs to form a type
@@ -65,6 +66,34 @@ get_types(Module, Mode, Types) :-
       (Mode = input, signatures(Module, Sigs, _)) ),
     get_types_by_gate(Module, 0, Sigs, Types).
 
+% Same as get_types, except gets rid of the gate and module name info
+get_flattened_types(Module, Mode, Types) :-
+    get_types(Module, Mode, TypesUnflattened),
+    maplist(flatten_tuple, TypesUnflattened, Types).
+
+% Types_compatible(upstream protcol, input protocol)
+types_compatible(_, [X]) :-
+    var(X).
+types_compatible(_, [payload]).
+types_compatible(UpProt, DownProt) :-
+    (UpProt = [UpProt1-_ | UpProtRest]; UpProt = [UpProt1 | UpProtRest]),
+    (DownProt = [DownProt1-_ | DownProtRest]; DownProt = [DownProt1 | DownProtRest]),
+    layer(UpProt1, Layer),
+    layer(DownProt1, Layer),
+    subtype(UpProt1, DownProt1),
+    types_compatible(UpProtRest, DownProtRest). 
+
+% TODO:
+% Currently support only one input gate per module
+% No support for reduction either
+reduced_types(Module, UpstreamTypes, [ReducedType]) :-
+    connected(Parent, _, Module, _),
+    memberchk((Parent, _, ReducedType), UpstreamTypes).
+
+% TODO:
+% cascading, etc goes here 
+new_types(Module, _, ModuleTypes) :-
+    get_types(Module, output, ModuleTypes).
 
 % ------------------- Attribute Rules -------------------------------
 
@@ -109,10 +138,37 @@ get_attrs(Module, Mode, Attrs) :-
       (Mode = input, signatures(Module, Sigs, _)) ),
     get_attrs_by_gate(Module, 0, Sigs, Attrs).
 
+% Same as get_attrs, except gets rid of the gate and module name info
+get_flattened_attrs(Module, Mode, Attrs) :-
+    get_attrs(Module, Mode, AttrsUnflattened),
+    maplist(flatten_tuple, AttrsUnflattened, Attrs).
+
+% TODO:
+% Currently support only one input gate per module
+% No support for reduction either
+reduced_attrs(Module, UpstreamAttrs, [ReducedAttrs]) :-
+    connected(Parent, _, Module, _),
+    memberchk((Parent, _, ReducedAttrs), UpstreamAttrs).
+
+% TODO:
+% cascading, etc goes here
+new_attrs(Module, _, ModuleAttrs) :-
+    get_attrs(Module, output, ModuleAttrs).
+
+
+check_all_attributes(_, []).
+check_all_attributes(UpstreamAttrs, InputAttrs) :-
+    InputAttrs = [(InputProt, InputName, InputVal) | InputAttrsRest],
+    memberchk((InputProt, InputName, UpstreamVal), UpstreamAttrs),
+    compatible(InputProt, InputName, UpstreamVal, InputVal),
+    check_all_attributes(UpstreamAttrs, InputAttrsRest).
+
 
 % ------------------- Signature Checking ----------------------------
 
-
+    
+% Used to map (Module, Gate, Type/Attrs) to Type/Attrs
+flatten_tuple((_,_,Val), Val).
 
 % all modules have been visited
 verify_signatures(Explored, _, _) :-
@@ -125,9 +181,32 @@ verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     get_types(Module, output, ModuleTypes),
     get_attrs(Module, output, ModuleAttrs),
     append(UpstreamTypes, ModuleTypes, UpdatedUpstreamTypes),
-    append(UpstreamAttrs, ModuleAttrs, UpdatedUpstreamAttrs).
-    %verify_signatures([Module | Explored], UpdatedUpstreamTypes, UpdatedUpstreamAttrs), !.
-
+    append(UpstreamAttrs, ModuleAttrs, UpdatedUpstreamAttrs),
+    verify_signatures([Module | Explored], UpdatedUpstreamTypes, UpdatedUpstreamAttrs), !.
+% verify signatures for all non-source modules
+verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
+    connected(_, _, Module, _),
+    foreach(connected(Parent, _, Module, _), memberchk(Parent, Explored) ),
+    not(memberchk(Module, Explored)),
+    get_flattened_types(Module, input, InputTypes),
+    get_flattened_attrs(Module, input, InputAttrs),
+    reduced_types(Module, UpstreamTypes, ReducedTypes),
+    reduced_attrs(Module, UpstreamAttrs, ReducedAttrs), 
+    length(InputTypes, NumInputGates),
+    MaxGateIndex is NumInputGates - 1,  
+    foreach(between(0, MaxGateIndex, GateIndex),
+            (nth0(GateIndex, InputTypes, InputType),
+             nth0(GateIndex, ReducedTypes, ReducedType),
+             types_compatible(ReducedType, InputType))),
+    foreach(between(0, MaxGateIndex, GateIndex),
+            (nth0(GateIndex, InputAttrs, InputAttr),
+             nth0(GateIndex, ReducedAttrs, ReducedAttr),
+             check_all_attributes(ReducedAttr, InputAttr))),
+    new_types(Module, UpstreamTypes, OutputTypes),
+    new_attrs(Module, UpstreamAttrs, OutputAttrs),
+    append(UpstreamTypes, OutputTypes, UpdatedUpstreamTypes),
+    append(UpstreamAttrs, OutputAttrs, UpdatedUpstreamAttrs),
+    verify_signatures([Module | Explored], UpdatedUpstreamTypes, UpdatedUpstreamAttrs), !.
 
 
 % ------------------- Framework Entry Point -------------------------
