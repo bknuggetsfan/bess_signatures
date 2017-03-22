@@ -38,11 +38,20 @@ remove_tail(Lst, NewLst) :-
 % ===================== PIPELINE TRAVERSAL ==========================
 
 
+% ------------------------ Module Information ------------------------
+
+num_igates(Module, NumIgates) :-
+    signatures(Module, InputSigs, _),
+    length(InputSigs, NumIgates).
+
+num_ogates(Module, NumOgates) :-
+    signatures(Module, _, OutputSigs),
+    length(OutputSigs, NumOgates).
 
 % ------------------------ Type Rules -------------------------------
 
-% Takes protocols and strips offs protocol attrs to form a type
-% Type is a list of protocols
+% takes in protocols and strips off protocol attrs to form a type
+% type is an ordered list of protocols
 strip_protocol_attrs([], []).
 strip_protocol_attrs(Prots, Type) :-
     Prots = [Prot | ProtsRest],
@@ -59,19 +68,19 @@ get_types_by_gate(Module, Gate, Signatures, Types) :-
     get_types_by_gate(Module, NextGate, SigsRest, TypesRest),
     Types = [ (Module, Gate, GateType) | TypesRest].
 
-% Wrapper for getting input or output types of a module
-% Types is a list of (Module Name, Gate, Type) tuples
+% wrapper for getting input or output types of a module
+% types is a list of (module, gate, type) tuples
 get_types(Module, Mode, Types) :-
     ( (Mode = output, signatures(Module, _, Sigs)) ;
       (Mode = input, signatures(Module, Sigs, _)) ),
     get_types_by_gate(Module, 0, Sigs, Types).
 
-% Same as get_types, except gets rid of the gate and module name info
+% same as get_types, except gets rid of the gate and module name info
 get_flattened_types(Module, Mode, Types) :-
     get_types(Module, Mode, TypesUnflattened),
     maplist(flatten_tuple, TypesUnflattened, Types).
 
-% Types_compatible(upstream protcol, input protocol)
+% types_compatible(upstream protcol, input protocol)
 types_compatible(_, [X]) :-
     var(X).
 types_compatible(_, [payload]).
@@ -83,12 +92,34 @@ types_compatible(UpProt, DownProt) :-
     subtype(UpProt1, DownProt1),
     types_compatible(UpProtRest, DownProtRest). 
 
-% TODO:
-% Currently support only one input gate per module
-% No support for reduction either
+% retrieve all types that feed into the given igate
+all_input_types_per_igate(_, _, [], []).
+all_input_types_per_igate(Module, Igate, UpstreamTypes, AllTypes) :-
+    UpstreamTypes = [UpstreamType | UpstreamTypesRest],
+    UpstreamType = (UpModule, UpOgate, _),
+    connected(UpModule, UpOgate, Module, Igate),
+    all_input_types_per_igate(Module, Igate, UpstreamTypesRest, AllTypesRest),
+    AllTypes = (UpstreamType, AllTypesRest).
+
+% reduce all types that feed into the given igate
+%% reduced_igate_types([], []).
+%% reduced_igate_types(IgateTypes, ReducedTypes) :-
+%%     nl.
+
+% For each input gate, reduce all hooks into a single type
+%% reduced_types(Module, UpstreamTypes, Igate, ReducedTypes) :-
+%%     num_igates(Module, NumIgates),
+%%     Igate < NumIgates,
+%%     all_input_types_per_igate(Module, Igate, UpstreamTypes, AllTypes),
+%%     reduce_igate_types(AllTypes, ReducedType),
+%%     NextIgate is Igate + 1,
+%%     reduced_types(Module, UpstreamTypes, NextIgate, ReducedTypesRest),
+%%     ReducedTypes = [ReducedType | ReducedTypesRest].    
+%% reduced_types(_, _, _, []).
+
 reduced_types(Module, UpstreamTypes, [ReducedType]) :-
-    connected(Parent, _, Module, _),
-    memberchk((Parent, _, ReducedType), UpstreamTypes).
+     connected(Parent, _, Module, _),
+     memberchk((Parent, _, ReducedType), UpstreamTypes).
 
 % TODO:
 % cascading, etc goes here 
@@ -97,8 +128,8 @@ new_types(Module, _, ModuleTypes) :-
 
 % ------------------- Attribute Rules -------------------------------
 
-% Takes protocols and extracts the protocol attributes
-% Attrs is a list of (Protocol, Attr Name, Attr Value) tuples
+% takes protocols and extracts the protocol attributes
+% attributes are stored as a list of (protocol, attr Name, attr Value) tuples
 extract_protocol_attrs([], []).
 extract_protocol_attrs([X], []) :-
     var(X).
@@ -117,7 +148,7 @@ extract_protocol_attrs(Prots, Attrs) :-
     extract_protocol_attrs([Prot-ProtAttrsRest | ProtsRest], RestAttrs),
     Attrs = [ (Prot, ProtName, ProtVal) | RestAttrs].
 
-% Maps an agnostic attribute to ("agnotic", attr name, attr val)
+% maps an agnostic attribute to ("agnotic", attr name, attr val)
 agnostic_map(Name-Val, (agnostic, Name, Val)).
     
 get_attrs_by_gate(_, _, [], []). 
@@ -131,14 +162,14 @@ get_attrs_by_gate(Module, Gate, Signatures, Attrs) :-
     get_attrs_by_gate(Module, NextGate, SigsRest, AttrsRest),
     Attrs = [(Module, Gate, GateAttrs) | AttrsRest].
 
-% Wrapper for getting input or output attrs of a Module
-% Attrs is a list composed of (Module Name, Gate Number, Attrs) tuples
+% wrapper for getting input or output attrs of a module
+% attrs is a list composed of (Module Name, Gate Number, Attrs) tuples
 get_attrs(Module, Mode, Attrs) :-
     ( (Mode = output, signatures(Module, _, Sigs)) ;
       (Mode = input, signatures(Module, Sigs, _)) ),
     get_attrs_by_gate(Module, 0, Sigs, Attrs).
 
-% Same as get_attrs, except gets rid of the gate and module name info
+% same as get_attrs, except gets rid of the gate and module name info
 get_flattened_attrs(Module, Mode, Attrs) :-
     get_attrs(Module, Mode, AttrsUnflattened),
     maplist(flatten_tuple, AttrsUnflattened, Attrs).
@@ -155,7 +186,7 @@ reduced_attrs(Module, UpstreamAttrs, [ReducedAttrs]) :-
 new_attrs(Module, _, ModuleAttrs) :-
     get_attrs(Module, output, ModuleAttrs).
 
-
+% checks if list of attrs is compatible with another list of attrs
 check_all_attributes(_, []).
 check_all_attributes(UpstreamAttrs, InputAttrs) :-
     InputAttrs = [(InputProt, InputName, InputVal) | InputAttrsRest],
@@ -167,14 +198,14 @@ check_all_attributes(UpstreamAttrs, InputAttrs) :-
 % ------------------- Signature Checking ----------------------------
 
     
-% Used to map (Module, Gate, Type/Attrs) to Type/Attrs
+% maps (module, gate, type/attrs) to type/attrs
 flatten_tuple((_,_,Val), Val).
 
-% all modules have been visited
+% visited all modules
 verify_signatures(Explored, _, _) :-
     foreach( (connected(Module,_,_,_); connected(_,_,Module,_)),
             memberchk(Module, Explored) ).
-% verify signatures for all source modules
+% verify source modules
 verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     connected(Module, _, _, _),
     not( (connected(_, _, Module, _); memberchk(Module, Explored)) ),
@@ -183,7 +214,7 @@ verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     append(UpstreamTypes, ModuleTypes, UpdatedUpstreamTypes),
     append(UpstreamAttrs, ModuleAttrs, UpdatedUpstreamAttrs),
     verify_signatures([Module | Explored], UpdatedUpstreamTypes, UpdatedUpstreamAttrs), !.
-% verify signatures for all non-source modules
+% verify non-source modules
 verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     connected(_, _, Module, _),
     foreach(connected(Parent, _, Module, _), memberchk(Parent, Explored) ),
