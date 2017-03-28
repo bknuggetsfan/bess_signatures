@@ -3,7 +3,7 @@
 %                      FRAMEWORK
 % ===================================================================
 
-:-use_module(pipeline_simple).
+:-use_module('tests/pipeline_multiple_input_hooks').
 :-discontiguous([attr/2, compatible/4, reduce/5]).
 
 % ==================== UTIlITIES ====================================
@@ -92,6 +92,16 @@ types_compatible(UpProt, DownProt) :-
     subtype(UpProt1, DownProt1),
     types_compatible(UpProtRest, DownProtRest). 
 
+% given all input types and all upstream types, checks pairwise compatiblity
+all_types_compatible(_, []).
+all_types_compatible(InputTypes, UpstreamTypes) :-
+    UpstreamTypes = [(UpstreamType, Igate) | UpstreamTypesRest],
+    nth0(Igate, InputTypes, InputType),
+    types_compatible(UpstreamType, InputType),
+    print(UpstreamType),
+    nl,
+    all_types_compatible(InputTypes, UpstreamTypesRest).
+
 % retrieve all types that feed into the given igate
 all_input_types_per_igate(_, _, [], []).
 all_input_types_per_igate(Module, Igate, UpstreamTypes, AllTypes) :-
@@ -101,7 +111,6 @@ all_input_types_per_igate(Module, Igate, UpstreamTypes, AllTypes) :-
     all_input_types_per_igate(Module, Igate, UpstreamTypesRest, AllTypesRest),
     AllTypes = (UpstreamType, AllTypesRest).
 
-% reduce all types that feed into the given igate
 %% reduced_igate_types([], []).
 %% reduced_igate_types(IgateTypes, ReducedTypes) :-
 %%     nl.
@@ -117,9 +126,17 @@ all_input_types_per_igate(Module, Igate, UpstreamTypes, AllTypes) :-
 %%     ReducedTypes = [ReducedType | ReducedTypesRest].    
 %% reduced_types(_, _, _, []).
 
+% list of ALL upstream types represented as (type, igate)
+all_upstream_types(Module, UpstreamTypes, AllTypes) :-
+    findall((Type, Igate), 
+            ( connected(Parent, Ogate, Module, Igate),
+              memberchk((Parent, Ogate, Type), UpstreamTypes) ),
+            AllTypes).
+
+% reduce all types that feed into the given igate
 reduced_types(Module, UpstreamTypes, [ReducedType]) :-
-     connected(Parent, _, Module, _),
-     memberchk((Parent, _, ReducedType), UpstreamTypes).
+    connected(Parent, _, Module, _),
+    memberchk((Parent, _, ReducedType), UpstreamTypes).
 
 % TODO:
 % cascading, etc goes here 
@@ -221,18 +238,16 @@ verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     not(memberchk(Module, Explored)),
     get_flattened_types(Module, input, InputTypes),
     get_flattened_attrs(Module, input, InputAttrs),
+    all_upstream_types(Module, UpstreamTypes, AllUpstreamTypes),
     reduced_types(Module, UpstreamTypes, ReducedTypes),
     reduced_attrs(Module, UpstreamAttrs, ReducedAttrs), 
     length(InputTypes, NumInputGates),
-    MaxGateIndex is NumInputGates - 1,  
-    foreach(between(0, MaxGateIndex, GateIndex),
-            (nth0(GateIndex, InputTypes, InputType),
-             nth0(GateIndex, ReducedTypes, ReducedType),
-             types_compatible(ReducedType, InputType))),
-    foreach(between(0, MaxGateIndex, GateIndex),
-            (nth0(GateIndex, InputAttrs, InputAttr),
-             nth0(GateIndex, ReducedAttrs, ReducedAttr),
-             check_all_attributes(ReducedAttr, InputAttr))),
+    MaxGateIndex is NumInputGates - 1, 
+    all_types_compatible(InputTypes, AllUpstreamTypes),
+    %foreach(between(0, MaxGateIndex, GateIndex),
+    %        (nth0(GateIndex, InputAttrs, InputAttr),
+    %         nth0(GateIndex, ReducedAttrs, ReducedAttr),
+    %         check_all_attributes(ReducedAttr, InputAttr))),
     new_types(Module, UpstreamTypes, OutputTypes),
     new_attrs(Module, UpstreamAttrs, OutputAttrs),
     append(UpstreamTypes, OutputTypes, UpdatedUpstreamTypes),
@@ -259,7 +274,6 @@ layer(l3).
 layer(l4).
 
 child(ethernet, l2).
-child(vlan, l2).
 child(ip, l3).
 child(ipv4, ip).
 child(ipv6, ip).
