@@ -98,8 +98,6 @@ all_types_compatible(InputTypes, UpstreamTypes) :-
     UpstreamTypes = [(UpstreamType, Igate) | UpstreamTypesRest],
     nth0(Igate, InputTypes, InputType),
     types_compatible(UpstreamType, InputType),
-    print(UpstreamType),
-    nl,
     all_types_compatible(InputTypes, UpstreamTypesRest).
 
 % retrieve all types that feed into the given igate
@@ -191,6 +189,13 @@ get_flattened_attrs(Module, Mode, Attrs) :-
     get_attrs(Module, Mode, AttrsUnflattened),
     maplist(flatten_tuple, AttrsUnflattened, Attrs).
 
+% list of ALL upstream types represented as (type, igate)
+all_upstream_attrs(Module, UpstreamAttrs, AllAttrs) :-
+    findall((Attrs, Igate), 
+            ( connected(Parent, Ogate, Module, Igate),
+              memberchk((Parent, Ogate, Attrs), UpstreamAttrs) ),
+            AllAttrs).
+
 % TODO:
 % Currently support only one input gate per module
 % No support for reduction either
@@ -204,12 +209,20 @@ new_attrs(Module, _, ModuleAttrs) :-
     get_attrs(Module, output, ModuleAttrs).
 
 % checks if list of attrs is compatible with another list of attrs
-check_all_attributes(_, []).
-check_all_attributes(UpstreamAttrs, InputAttrs) :-
+check_attributes(_, []).
+check_attributes(UpstreamAttrs, InputAttrs) :-
     InputAttrs = [(InputProt, InputName, InputVal) | InputAttrsRest],
     memberchk((InputProt, InputName, UpstreamVal), UpstreamAttrs),
     compatible(InputProt, InputName, UpstreamVal, InputVal),
-    check_all_attributes(UpstreamAttrs, InputAttrsRest).
+    check_attributes(UpstreamAttrs, InputAttrsRest).
+
+% given all input attrs and all upstream attrs, checks pairwise compatiblity
+all_attrs_compatible(_, []).
+all_attrs_compatible(InputAttrs, UpstreamAttrs) :-
+    UpstreamAttrs = [(UpstreamAttr, Igate) | UpstreamAttrsRest],
+    nth0(Igate, InputAttrs, InputAttr),
+    check_attributes(UpstreamAttr, InputAttr),
+    all_attrs_compatible(InputAttrs, UpstreamAttrsRest).
 
 
 % ------------------- Signature Checking ----------------------------
@@ -239,15 +252,9 @@ verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     get_flattened_types(Module, input, InputTypes),
     get_flattened_attrs(Module, input, InputAttrs),
     all_upstream_types(Module, UpstreamTypes, AllUpstreamTypes),
-    reduced_types(Module, UpstreamTypes, ReducedTypes),
-    reduced_attrs(Module, UpstreamAttrs, ReducedAttrs), 
-    length(InputTypes, NumInputGates),
-    MaxGateIndex is NumInputGates - 1, 
+    all_upstream_attrs(Module, UpstreamAttrs, AllUpstreamAttrs),
     all_types_compatible(InputTypes, AllUpstreamTypes),
-    %foreach(between(0, MaxGateIndex, GateIndex),
-    %        (nth0(GateIndex, InputAttrs, InputAttr),
-    %         nth0(GateIndex, ReducedAttrs, ReducedAttr),
-    %         check_all_attributes(ReducedAttr, InputAttr))),
+    all_attrs_compatible(InputAttrs, AllUpstreamAttrs),
     new_types(Module, UpstreamTypes, OutputTypes),
     new_attrs(Module, UpstreamAttrs, OutputAttrs),
     append(UpstreamTypes, OutputTypes, UpdatedUpstreamTypes),
