@@ -3,7 +3,7 @@
 %                      FRAMEWORK
 % ===================================================================
 
-:-use_module('tests/pipeline_combine_multiple_hooks').
+:-use_module('tests/pipeline_incorrect_simple').
 :-discontiguous([attr/2, compatible/4, reduce/5]).
 
 % ==================== UTIlITIES ====================================
@@ -97,7 +97,7 @@ all_types_compatible(_, []).
 all_types_compatible(InputTypes, UpstreamTypes) :-
     UpstreamTypes = [(UpstreamType, Igate) | UpstreamTypesRest],
     nth0(Igate, InputTypes, InputType),
-    types_compatible(UpstreamType, InputType),
+    (types_compatible(UpstreamType, InputType) -> true; false),
     all_types_compatible(InputTypes, UpstreamTypesRest).
 
 % retrieve all types that feed into the given igate
