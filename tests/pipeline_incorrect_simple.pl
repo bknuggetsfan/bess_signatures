@@ -15,11 +15,11 @@ signatures(a, [], [Out0, Out1]) :-
 
 signatures(b, [], [Out0, Out1]) :-
     Out0 = ([ethernet-[eth_test1-2], ipv6, payload], []),
-    Out1 = ([ethernet, payload], [agnostic_test3-1]).
+    Out1 = ([ethernet, payload], [agnostic_test3-2]).
 
 signatures(c, [], [Out0]) :-
     Out0 = ([ethernet-[eth_test1-3], ipv4, payload], []).
 
 signatures(d, [In0, In1], []) :-
     In0 = ([ethernet-[eth_test1-4], ip, payload], []),
-    In1 =([payload], [agnostic_test3-1]).
+    In1 =([ip, payload], [agnostic_test3-1]).

@@ -266,7 +266,7 @@ verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     get_attrs(Module, output, ModuleAttrs),
     append(UpstreamTypes, ModuleTypes, UpdatedUpstreamTypes),
     append(UpstreamAttrs, ModuleAttrs, UpdatedUpstreamAttrs),
-    verify_signatures([Module | Explored], UpdatedUpstreamTypes, UpdatedUpstreamAttrs), !.
+    verify_signatures([Module | Explored], UpdatedUpstreamTypes, UpdatedUpstreamAttrs).
 % verify non-source modules
 verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     connected(_, _, Module, _),
@@ -284,7 +284,7 @@ verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     new_attrs(Module, UpstreamAttrs, OutputAttrs),
     append(UpstreamTypes, OutputTypes, UpdatedUpstreamTypes),
     append(UpstreamAttrs, OutputAttrs, UpdatedUpstreamAttrs),
-    verify_signatures([Module | Explored], UpdatedUpstreamTypes, UpdatedUpstreamAttrs), !.
+    verify_signatures([Module | Explored], UpdatedUpstreamTypes, UpdatedUpstreamAttrs).
 
 
 % ------------------- Framework Entry Point -------------------------
@@ -329,38 +329,42 @@ layer(Prot, Layer) :-
 
 % attr(protocol, attribute name)
 % compatible(protocol, attribute name, upstream/output attr value, donwnstream/input attr value) 
-% reduce(protocol, attribute name, value1, value2, reduced/combined value)
+% combine(protocol, attribute name, value1, value2, reduced/combined value)
 
 % -------------------- Test Cases -----------------------------------
 
 attr(ethernet, eth_test1).
 compatible(ethernet, eth_test1, ValUp, ValDown) :-
     ValDown > ValUp.
-reduce(ethernet, eth_test1, Val1, Val2, NewVal) :-
+combine(ethernet, eth_test1, Val1, Val2, NewVal) :-
     Val2 > Val1 -> NewVal = Val2 ; NewVal = Val1.
 
 attr(agnostic, agnostic_test1).
 compatible(agnostic, agnostic_test1, correct, _).
+combine(agnostic, agnostic_test1, Val1, Val2, Val1).
 
 attr(agnostic, agnostic_test2).
 compatible(agnostic, agnostic_test2, ValUp, ValDown) :-
     ValDown > ValUp.
+combine(agnostic, agnostic_test2, Val1, Val2, NewVal) :-
+    NewVal is Val1 + Val2.
 
 attr(agnostic, agnostic_test3).
 compatible(agnostic, agnostic_test3, Val, Val).
+combine(agnostic, agnostic_test3, Val, Val, Val).
 
 % -------------------- (Possible) Use Cases -------------------------
 
 attribute(ipv4, checksum).
 compatible(ipv4, checksum, correct, _).
-reduce(ipv4, checksum, Checksum1, Checksum2, NewChecksum) :-
+combine(ipv4, checksum, Checksum1, Checksum2, NewChecksum) :-
     ((Checksum1 = correct; Checksum2 = correct)
      -> NewChecksum = incorrect
      ; NewChecksum = correct).
 
 attr(ipv4, destAddressSet).
 compatible(ipv4, destAddressSet, correct, _).
-reduce(ipv4, destAddressSet, Val1, Val2, NewVal) :-
-    ((Val1 = correct; Val2 = correct)
-     -> NewVal = incorrect
-     ; NewVal = correct).
+combine(ipv4, destAddressSet, AddrSet1, AddrSet2, AddrSetNew) :-
+    ((AddrSet1 = correct; AddrSet2 = correct)
+     -> AddrSetNew = incorrect
+     ; AddrSetNew = correct).
