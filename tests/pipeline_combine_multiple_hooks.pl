@@ -1,5 +1,5 @@
 
-:- module(pipeline_combine_multiple_gates, [connected/4, signatures/3]).
+:- module(pipeline_combine_multiple_hooks, [connected/4, signatures/3]).
 
 connected(a, 0, c, 0).
 connected(b, 0, c, 0).

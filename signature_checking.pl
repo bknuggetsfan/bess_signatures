@@ -3,7 +3,7 @@
 %                      FRAMEWORK
 % ===================================================================
 
-:-use_module('tests/pipeline_combine_multiple_gates').
+:-use_module('tests/pipeline_combine_multiple_hooks').
 :-discontiguous([attr/2, compatible/4, reduce/5]).
 
 % ==================== UTIlITIES ====================================
