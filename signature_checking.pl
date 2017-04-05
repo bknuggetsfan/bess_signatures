@@ -3,7 +3,7 @@
 %                      FRAMEWORK
 % ===================================================================
 
-:-use_module('tests/pipeline_multiple_input_hooks').
+:-use_module('tests/pipeline_combine_multiple_gates').
 :-discontiguous([attr/2, compatible/4, reduce/5]).
 
 % ==================== UTIlITIES ====================================
@@ -131,7 +131,30 @@ all_upstream_types(Module, UpstreamTypes, AllTypes) :-
               memberchk((Parent, Ogate, Type), UpstreamTypes) ),
             AllTypes).
 
-% reduce all types that feed into the given igate
+% combines all hook types for the same gate into a single gate type
+% GateTypes is a list of all gate type, gate number tuples
+hook_types_to_gate_types([], []).
+hook_types_to_gate_types(HookTypes, GateTypes) :-
+    HookTypes = [(HookType, HookGate) | HookTypesRest],
+    hook_types_to_gate_types(HookTypesRest, GateTypesRest),
+    (member((GateType, HookGate), GateTypesRest) ->
+        (delete(GateTypesRest, (GateType, HookGate), GateTypesRestUpdated),
+        combine_types(HookType, GateType, NewType),
+        append(GateTypesRestUpdated, [(NewType, HookGate)], GateTypes)) ;
+        (append(GateTypesRest, [(HookType, HookGate)], GateTypes))).
+
+% combine (i.e. generalize) two types
+combine_types([payload], _, [payload]).
+combine_types(_, [payload], [payload]).
+combine_types(Type1, Type2, NewType) :-
+    Type1 = [Header1 | Type1Rest],
+    Type2 = [Header2 | Type2Rest],
+    combine_types(Type1Rest, Type2Rest, NewTypeRest),
+    (subtype(Header1, Header2) -> NewHeader = Header2; NewHeader = Header1),
+    NewType = [NewHeader | NewTypeRest]. 
+
+
+% combine all types that feed into the given igate
 reduced_types(Module, UpstreamTypes, [ReducedType]) :-
     connected(Parent, _, Module, _),
     memberchk((Parent, _, ReducedType), UpstreamTypes).
@@ -255,6 +278,8 @@ verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     all_upstream_attrs(Module, UpstreamAttrs, AllUpstreamAttrs),
     all_types_compatible(InputTypes, AllUpstreamTypes),
     all_attrs_compatible(InputAttrs, AllUpstreamAttrs),
+    hook_types_to_gate_types(AllUpstreamTypes, UpstreamTypesPerIgate),
+    %hook_attrs_to_gate_attrs(AllUpstreamAttrs, UpstreamAttrsPerIgate),
     new_types(Module, UpstreamTypes, OutputTypes),
     new_attrs(Module, UpstreamAttrs, OutputAttrs),
     append(UpstreamTypes, OutputTypes, UpdatedUpstreamTypes),

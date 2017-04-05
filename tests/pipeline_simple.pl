@@ -35,8 +35,8 @@ signatures(f, [In0], []) :-
 	In0 = ([ethernet-[eth_test1-4], payload], [agnostic_test2-5, agnostic_test3-incorrect]).
 
 signatures(g, [In0], [Out0]) :-
-	In0 = ([Packet], []),
-	Out0 = ([Packet], [agnostic_test1-correct]).
+	In0 = ([ethernet, payload], []),
+	Out0 = ([ethernet, payload], [agnostic_test1-correct]).
 
 signatures(h, [In0], []) :-
 	In0 = ([ethernet, payload], []).
