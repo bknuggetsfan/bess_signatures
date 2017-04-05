@@ -4,7 +4,7 @@
 % ===================================================================
 
 :-use_module('tests/pipeline_incorrect_simple').
-:-discontiguous([attr/2, compatible/4, reduce/5]).
+:-discontiguous([attr/2, compatible/4, combine/5]).
 
 % ==================== UTIlITIES ====================================
 
@@ -341,7 +341,7 @@ combine(ethernet, eth_test1, Val1, Val2, NewVal) :-
 
 attr(agnostic, agnostic_test1).
 compatible(agnostic, agnostic_test1, correct, _).
-combine(agnostic, agnostic_test1, Val1, Val2, Val1).
+combine(agnostic, agnostic_test1, Val1, _, Val1).
 
 attr(agnostic, agnostic_test2).
 compatible(agnostic, agnostic_test2, ValUp, ValDown) :-
