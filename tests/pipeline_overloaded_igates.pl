@@ -1,5 +1,5 @@
 
-:- module(pipeline_multiple_input_hooks, [connected/4, signatures/3]).
+:- module(pipeline_overloaded_igates, [connected/4, signatures/3]).
 
 % connected(Upstream Module, OGate, Downstream Module, IGate)
 connected(a, 0, d, 0).

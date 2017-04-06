@@ -3,7 +3,7 @@
 %                      FRAMEWORK
 % ===================================================================
 
-:-use_module('tests/pipeline_multiple_input_hooks').
+:-use_module('tests/pipeline_overloaded_igates').
 :-discontiguous([attr/2, compatible/4, combine/5]).
 
 % ==================== UTIlITIES ====================================
@@ -113,7 +113,7 @@ all_input_types_per_igate(Module, Igate, UpstreamTypes, AllTypes) :-
 %% reduced_igate_types(IgateTypes, ReducedTypes) :-
 %%     nl.
 
-% For each input gate, reduce all hooks into a single type
+% For each input gate, reduce all connections into a single type
 %% reduced_types(Module, UpstreamTypes, Igate, ReducedTypes) :-
 %%     num_igates(Module, NumIgates),
 %%     Igate < NumIgates,
@@ -131,17 +131,17 @@ all_upstream_types(Module, UpstreamTypes, AllTypes) :-
               memberchk((Parent, Ogate, Type), UpstreamTypes) ),
             AllTypes).
 
-% combines all hook types for the same gate into a single gate type
+% combines all connection types for the same gate into a single gate type
 % GateTypes is a list of all (gate type, gate number) tuples
-hook_types_to_gate_types([], []).
-hook_types_to_gate_types(HookTypes, GateTypes) :-
-    HookTypes = [(HookType, HookGate) | HookTypesRest],
-    hook_types_to_gate_types(HookTypesRest, GateTypesRest),
-    (member((GateType, HookGate), GateTypesRest) ->
-        (delete(GateTypesRest, (GateType, HookGate), GateTypesRestUpdated),
-        combine_types(HookType, GateType, NewType),
-        append(GateTypesRestUpdated, [(NewType, HookGate)], GateTypes)) ;
-        (append(GateTypesRest, [(HookType, HookGate)], GateTypes))).
+connection_types_to_gate_types([], []).
+connection_types_to_gate_types(ConnectionTypes, GateTypes) :-
+    ConnectionTypes = [(ConnectionType, ConnectionGate) | ConnectionTypesRest],
+    connection_types_to_gate_types(ConnectionTypesRest, GateTypesRest),
+    (member((GateType, ConnectionGate), GateTypesRest) ->
+        (delete(GateTypesRest, (GateType, ConnectionGate), GateTypesRestUpdated),
+        combine_types(ConnectionType, GateType, NewType),
+        append(GateTypesRestUpdated, [(NewType, ConnectionGate)], GateTypes)) ;
+        (append(GateTypesRest, [(ConnectionType, ConnectionGate)], GateTypes))).
 
 % combine (i.e. generalize) two types
 combine_types([payload], _, [payload]).
@@ -212,7 +212,7 @@ get_flattened_attrs(Module, Mode, Attrs) :-
     get_attrs(Module, Mode, AttrsUnflattened),
     maplist(flatten_tuple, AttrsUnflattened, Attrs).
 
-% list of ALL directly upstream attrs for a module represented as (attrs, igate, upstream module)
+% list of ALL directly upstream attrs for a module represented as (attrs, igate)
 all_upstream_attrs(Module, UpstreamAttrs, AllAttrs) :-
     findall((Attrs, Igate), 
             ( connected(Parent, Ogate, Module, Igate),
@@ -248,20 +248,20 @@ all_attrs_compatible(InputAttrs, UpstreamAttrs) :-
     all_attrs_compatible(InputAttrs, UpstreamAttrsRest).
 
 
-% combines hook attributes to form attrs for a single gate
+% combines connection attributes to form attrs for a single gate
 gate_attrs(_, [], []).
-gate_attrs(HookAttrs, GateType, []) :-
+gate_attrs(ConnectionAttrs, GateType, []) :-
     GateType = [Prot | GateTypeRest].
 
-% combines all hook attrs for the same gate into a single gate attrs
+% combines all connection attrs for the same gate into a single gate attrs
 % GateAttrs is a list of all (gate attrs, gate number) tuples
 % GateTypes are needed to extract only the necessary attrs for each gate
-hook_attrs_to_gate_attrs(_, [], []).
-hook_attrs_to_gate_attrs(HookAttrs, GateTypes, GateAttrs) :-
+connection_attrs_to_gate_attrs(_, [], []).
+connection_attrs_to_gate_attrs(ConnectionAttrs, GateTypes, GateAttrs) :-
     GateTypes = [(GateType, GateIndex) | GateTypesRest], 
-    findall((HookType, GateIndex), member((HookType, GateIndex), HookAttrs), HookAttrsForGate),
-    gate_attrs(HookAttrsForGate, GateType, GateAttrsForSingleGate),
-    hook_attrs_to_gate_attrs(HookAttrs,  GateTypesRest, GateAttrsRest),
+    findall((ConnectionType, GateIndex), member((ConnectionType, GateIndex), ConnectionAttrs), ConnectionAttrsForGate),
+    gate_attrs(ConnectionAttrsForGate, GateType, GateAttrsForSingleGate),
+    connection_attrs_to_gate_attrs(ConnectionAttrs,  GateTypesRest, GateAttrsRest),
     GateAttrs = [(GateAttrsForSingleGate, GateIndex) | GateAttrsRest].
 
 
@@ -296,8 +296,8 @@ verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     all_upstream_attrs(Module, UpstreamAttrs, AllUpstreamAttrs),
     all_types_compatible(InputTypes, AllUpstreamTypes),
     all_attrs_compatible(InputAttrs, AllUpstreamAttrs),
-    hook_types_to_gate_types(AllUpstreamTypes, UpstreamTypesPerIgate),
-    hook_attrs_to_gate_attrs(AllUpstreamAttrs, UpstreamTypesPerIgate, UpstreamAttrsPerIgate),
+    connection_types_to_gate_types(AllUpstreamTypes, UpstreamTypesPerIgate),
+    connection_attrs_to_gate_attrs(AllUpstreamAttrs, UpstreamTypesPerIgate, UpstreamAttrsPerIgate),
     new_types(Module, UpstreamTypes, OutputTypes),
     new_attrs(Module, UpstreamAttrs, OutputAttrs),
     append(UpstreamTypes, OutputTypes, UpdatedUpstreamTypes),
