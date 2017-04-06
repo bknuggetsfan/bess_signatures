@@ -3,7 +3,7 @@
 %                      FRAMEWORK
 % ===================================================================
 
-:-use_module('tests/pipeline_incorrect_simple').
+:-use_module('tests/pipeline_multiple_input_hooks').
 :-discontiguous([attr/2, compatible/4, combine/5]).
 
 % ==================== UTIlITIES ====================================
@@ -124,7 +124,7 @@ all_input_types_per_igate(Module, Igate, UpstreamTypes, AllTypes) :-
 %%     ReducedTypes = [ReducedType | ReducedTypesRest].    
 %% reduced_types(_, _, _, []).
 
-% list of ALL upstream types represented as (type, igate)
+% list of ALL directly upstream types for a module represented as (type, igate)
 all_upstream_types(Module, UpstreamTypes, AllTypes) :-
     findall((Type, Igate), 
             ( connected(Parent, Ogate, Module, Igate),
@@ -132,7 +132,7 @@ all_upstream_types(Module, UpstreamTypes, AllTypes) :-
             AllTypes).
 
 % combines all hook types for the same gate into a single gate type
-% GateTypes is a list of all gate type, gate number tuples
+% GateTypes is a list of all (gate type, gate number) tuples
 hook_types_to_gate_types([], []).
 hook_types_to_gate_types(HookTypes, GateTypes) :-
     HookTypes = [(HookType, HookGate) | HookTypesRest],
@@ -212,7 +212,7 @@ get_flattened_attrs(Module, Mode, Attrs) :-
     get_attrs(Module, Mode, AttrsUnflattened),
     maplist(flatten_tuple, AttrsUnflattened, Attrs).
 
-% list of ALL upstream types represented as (type, igate)
+% list of ALL directly upstream attrs for a module represented as (attrs, igate, upstream module)
 all_upstream_attrs(Module, UpstreamAttrs, AllAttrs) :-
     findall((Attrs, Igate), 
             ( connected(Parent, Ogate, Module, Igate),
@@ -248,6 +248,24 @@ all_attrs_compatible(InputAttrs, UpstreamAttrs) :-
     all_attrs_compatible(InputAttrs, UpstreamAttrsRest).
 
 
+% combines hook attributes to form attrs for a single gate
+gate_attrs(_, [], []).
+gate_attrs(HookAttrs, GateType, []) :-
+    GateType = [Prot | GateTypeRest].
+
+% combines all hook attrs for the same gate into a single gate attrs
+% GateAttrs is a list of all (gate attrs, gate number) tuples
+% GateTypes are needed to extract only the necessary attrs for each gate
+hook_attrs_to_gate_attrs(_, [], []).
+hook_attrs_to_gate_attrs(HookAttrs, GateTypes, GateAttrs) :-
+    GateTypes = [(GateType, GateIndex) | GateTypesRest], 
+    findall((HookType, GateIndex), member((HookType, GateIndex), HookAttrs), HookAttrsForGate),
+    gate_attrs(HookAttrsForGate, GateType, GateAttrsForSingleGate),
+    hook_attrs_to_gate_attrs(HookAttrs,  GateTypesRest, GateAttrsRest),
+    GateAttrs = [(GateAttrsForSingleGate, GateIndex) | GateAttrsRest].
+
+
+
 % ------------------- Signature Checking ----------------------------
 
     
@@ -279,7 +297,7 @@ verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     all_types_compatible(InputTypes, AllUpstreamTypes),
     all_attrs_compatible(InputAttrs, AllUpstreamAttrs),
     hook_types_to_gate_types(AllUpstreamTypes, UpstreamTypesPerIgate),
-    %hook_attrs_to_gate_attrs(AllUpstreamAttrs, UpstreamAttrsPerIgate),
+    hook_attrs_to_gate_attrs(AllUpstreamAttrs, UpstreamTypesPerIgate, UpstreamAttrsPerIgate),
     new_types(Module, UpstreamTypes, OutputTypes),
     new_attrs(Module, UpstreamAttrs, OutputAttrs),
     append(UpstreamTypes, OutputTypes, UpdatedUpstreamTypes),
