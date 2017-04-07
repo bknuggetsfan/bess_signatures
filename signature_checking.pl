@@ -3,7 +3,7 @@
 %                      FRAMEWORK
 % ===================================================================
 
-:-use_module('tests/pipeline_overloaded_igates').
+:-use_module('tests/pipeline_combine_multiple_attrs').
 :-discontiguous([attr/2, compatible/4, combine/5]).
 
 % ==================== UTIlITIES ====================================
@@ -247,22 +247,66 @@ all_attrs_compatible(InputAttrs, UpstreamAttrs) :-
     check_attributes(UpstreamAttr, InputAttr),
     all_attrs_compatible(InputAttrs, UpstreamAttrsRest).
 
+% given a list of attrs, combines attrs where applicable
+reduce_attrs(_, [], _, ReducedAttrs, ReducedAttrs).
+% case 1: at least one connection is missing the attr
+reduce_attrs(NumConnections, OriginalAttrs, OriginalAttrsCopy, ReducedAttrs, AllAttrs) :-
+    OriginalAttrs = [Attrs | OriginalAttrsRest],
+    Attrs = (Prot, Name, _),
+    findall((Prot, Name, _), member((Prot, Name, _), OriginalAttrsCopy), SharedAttrs),
+    length(SharedAttrs, NumAttrs),
+    not(NumAttrs = NumConnections),
+    reduce_attrs(NumConnections, OriginalAttrsRest, OriginalAttrsCopy, ReducedAttrs, AllAttrs).
+reduce_attrs(NumConnections, OriginalAttrs, OriginalAttrsCopy, ReducedAttrs, AllAttrs) :-
+    OriginalAttrs = [Attrs | OriginalAttrsRest],
+    Attrs = (Prot, Name, Val),
+    (memberchk((Prot, Name, Val2), ReducedAttrs) ->
+    (combine(Prot, Name, Val, Val2, NewVal),
+    delete(ReducedAttrs, (Prot, Name, Val2), ReducedAttrsUpdated),
+    (reduce_attrs(NumConnections, OriginalAttrsRest, OriginalAttrsCopy, [(Prot, Name, NewVal) | ReducedAttrsUpdated], AllAttrs)));
+    (reduce_attrs(NumConnections, OriginalAttrsRest, OriginalAttrsCopy, [(Prot, Name, Val) | ReducedAttrs], AllAttrs))).
 
-% combines connection attributes to form attrs for a single gate
-gate_attrs(_, [], []).
-gate_attrs(ConnectionAttrs, GateType, []) :-
-    GateType = [Prot | GateTypeRest].
+% combines connection attributes to form prot attrs for a single gate
+gate_protocol_attrs(_, [], [], _).
+gate_protocol_attrs(ConnectionAttrs, GateType, GateAttrs, NumConnections) :-
+    NumConnections = 1,
+    GateType = [Prot | GateTypeRest],
+    findall((Prot, AttrName, AttrValue), (member(Attrs, ConnectionAttrs), member((Prot, AttrName, AttrValue), Attrs)),
+        AllProtAttrs),
+    gate_protocol_attrs(ConnectionAttrs, GateTypeRest, GateAttrsRest, NumConnections),
+    append(AllProtAttrs, GateAttrsRest, GateAttrs).
+gate_protocol_attrs(ConnectionAttrs, GateType, GateAttrs, NumConnections) :-
+    GateType = [Prot | GateTypeRest],
+    findall((Prot, AttrName, AttrValue), (member(Attrs, ConnectionAttrs), member((Prot, AttrName, AttrValue), Attrs)),
+        AllProtAttrs),
+    reduce_attrs(NumConnections, AllProtAttrs, AllProtAttrs, [], ReducedProtAttrs),
+    gate_protocol_attrs(ConnectionAttrs, GateTypeRest, GateAttrsRest, NumConnections),
+    append(ReducedProtAttrs, GateAttrsRest, GateAttrs).
+
+% same as gate_protocol_attrs, except handles aganostic attrs
+gate_agnostic_attrs(ConnectionAttrs, AgnosticAttrs, NumConnections) :-
+    NumConnections = 1,
+    findall((agnostic, AttrName, AttrValue), (member(Attrs, ConnectionAttrs), member((agnostic, AttrName, AttrValue), Attrs)),
+        AgnosticAttrs).
+gate_agnostic_attrs(ConnectionAttrs, AgnosticAttrs, NumConnections) :-
+    findall((agnostic, AttrName, AttrValue), (member(Attrs, ConnectionAttrs), member((agnostic, AttrName, AttrValue), Attrs)),
+        AllAgnosticAttrs),
+    reduce_attrs(NumConnections, AllAgnosticAttrs, AllAgnosticAttrs, [], AgnosticAttrs).
+
 
 % combines all connection attrs for the same gate into a single gate attrs
 % GateAttrs is a list of all (gate attrs, gate number) tuples
 % GateTypes are needed to extract only the necessary attrs for each gate
 connection_attrs_to_gate_attrs(_, [], []).
-connection_attrs_to_gate_attrs(ConnectionAttrs, GateTypes, GateAttrs) :-
+connection_attrs_to_gate_attrs(AllConnectionAttrs, GateTypes, GateAttrs) :-
     GateTypes = [(GateType, GateIndex) | GateTypesRest], 
-    findall((ConnectionType, GateIndex), member((ConnectionType, GateIndex), ConnectionAttrs), ConnectionAttrsForGate),
-    gate_attrs(ConnectionAttrsForGate, GateType, GateAttrsForSingleGate),
-    connection_attrs_to_gate_attrs(ConnectionAttrs,  GateTypesRest, GateAttrsRest),
-    GateAttrs = [(GateAttrsForSingleGate, GateIndex) | GateAttrsRest].
+    findall(ConnectionAttrs, member((ConnectionAttrs, GateIndex), AllConnectionAttrs), ConnectionAttrsForGate),
+    length(ConnectionAttrsForGate, NumConnections),
+    gate_protocol_attrs(ConnectionAttrsForGate, GateType, ProtAttrsForGate, NumConnections),
+    gate_agnostic_attrs(ConnectionAttrsForGate, AgnosticAttrsForGate, NumConnections),
+    append(ProtAttrsForGate, AgnosticAttrsForGate, AllAttrsForGate),
+    connection_attrs_to_gate_attrs(AllConnectionAttrs,  GateTypesRest, GateAttrsRest),
+    GateAttrs = [(AllAttrsForGate, GateIndex) | GateAttrsRest].
 
 
 
@@ -373,16 +417,18 @@ combine(agnostic, agnostic_test3, Val, Val, Val).
 
 % -------------------- (Possible) Use Cases -------------------------
 
-attribute(ipv4, checksum).
+attr(ipv4, checksum).
 compatible(ipv4, checksum, correct, _).
+compatible(ipv4, checksum, _, incorrect).
 combine(ipv4, checksum, Checksum1, Checksum2, NewChecksum) :-
-    ((Checksum1 = correct; Checksum2 = correct)
-     -> NewChecksum = incorrect
-     ; NewChecksum = correct).
+    ((Checksum1 = correct, Checksum2 = correct)
+     -> NewChecksum = correct
+     ; NewChecksum = incorrect).
 
 attr(ipv4, destAddressSet).
 compatible(ipv4, destAddressSet, correct, _).
+compatible(ipv4, destAddressSet, _, incorrect).
 combine(ipv4, destAddressSet, AddrSet1, AddrSet2, AddrSetNew) :-
-    ((AddrSet1 = correct; AddrSet2 = correct)
-     -> AddrSetNew = incorrect
-     ; AddrSetNew = correct).
+    ((AddrSet1 = correct, AddrSet2 = correct)
+     -> AddrSetNew = correct
+     ; AddrSetNew = incorrect).
