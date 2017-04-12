@@ -18,7 +18,7 @@ signatures(a, [], [Out0, Out1]) :-
 
 signatures(b, [], [Out0, Out1]) :-
     Out0 = ([ethernet-[eth_test1-2], ip, payload], []),
-    Out1 = ([ethernet, ipv4, payload], [agnostic_test3-1]).
+    Out1 = ([ethernet, ipv6, payload], [agnostic_test3-1]).
 
 signatures(c, [], [Out0]) :-
     Out0 = ([ethernet-[eth_test1-3], ip, payload], []).
@@ -35,7 +35,7 @@ signatures(e, [In0, In1, In2], [Out0, Out1, Out2]) :-
     Out1 = ([payload], []),
     Out2 = ([payload], []).
 
-%no_path(module, igate, ogate)
+% no_path(module, igate, ogate)
 no_path(e, 2, 1).
 no_path(e, 0, 1).
 no_path(e, 1, 2).

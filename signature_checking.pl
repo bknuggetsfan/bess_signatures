@@ -150,7 +150,8 @@ combine_types(Type1, Type2, NewType) :-
     Type1 = [Header1 | Type1Rest],
     Type2 = [Header2 | Type2Rest],
     combine_types(Type1Rest, Type2Rest, NewTypeRest),
-    (subtype(Header1, Header2) -> NewHeader = Header2; NewHeader = Header1),
+    subtype(Header1, NewHeader),
+    subtype(Header2, NewHeader),
     NewType = [NewHeader | NewTypeRest]. 
 
 
