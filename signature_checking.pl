@@ -109,20 +109,6 @@ all_input_types_per_igate(Module, Igate, UpstreamTypes, AllTypes) :-
     all_input_types_per_igate(Module, Igate, UpstreamTypesRest, AllTypesRest),
     AllTypes = (UpstreamType, AllTypesRest).
 
-%% reduced_igate_types([], []).
-%% reduced_igate_types(IgateTypes, ReducedTypes) :-
-%%     nl.
-
-% For each input gate, reduce all connections into a single type
-%% reduced_types(Module, UpstreamTypes, Igate, ReducedTypes) :-
-%%     num_igates(Module, NumIgates),
-%%     Igate < NumIgates,
-%%     all_input_types_per_igate(Module, Igate, UpstreamTypes, AllTypes),
-%%     reduce_igate_types(AllTypes, ReducedType),
-%%     NextIgate is Igate + 1,
-%%     reduced_types(Module, UpstreamTypes, NextIgate, ReducedTypesRest),
-%%     ReducedTypes = [ReducedType | ReducedTypesRest].    
-%% reduced_types(_, _, _, []).
 
 % list of ALL directly upstream types for a module represented as (type, igate)
 all_upstream_types(Module, UpstreamTypes, AllTypes) :-
@@ -343,39 +329,6 @@ connection_attrs_to_gate_attrs(AllConnectionAttrs, GateTypes, GateAttrs) :-
     append(ProtAttrsForGate, AgnosticAttrsForGate, AllAttrsForGate),
     connection_attrs_to_gate_attrs(AllConnectionAttrs,  GateTypesRest, GateAttrsRest),
     GateAttrs = [(AllAttrsForGate, GateIndex) | GateAttrsRest].
-
-
-%% % combines types in a list reduction-style
-%% combine_all_types([Type1], Type1).
-%% combine_all_types([Type1, Type2], CombinedType) :-
-%%     combine_types(Type1, Type2, CombinedType).
-%% combine_all_types(Types, CombinedType) :-
-%%     Types = [Type1, Type2 | RestTypes],
-%%     RestTypes = [_ | _],
-%%     combine_types(Type1, Type2, CombinedTypeTemp),
-%%     combine_all_types([CombinedTypeTemp | RestTypes], CombinedType).
-
-
-%% filter_unused_igate_types([], _, []).
-%% filter_unused_igate_types(IgateTypes, UnusedIgates, UsedIgateTypes) :-
-%%     IgateTypes = [(_, Igate) | IgateTypesRest],
-%%     memberchk(Igate, UnusedIgates), 
-%%     filter_unused_igate_types(IgateTypesRest, UnusedIgates, UsedIgateTypes).
-%% filter_unused_igate_types(IgateTypes, UnusedIgates, UsedIgateTypes) :-
-%%     IgateTypes = [(IgateType, Igate) | IgateTypesRest],
-%%     filter_unused_igate_types(IgateTypesRest, UnusedIgates, UsedIgateTypesRest),
-%%     UsedIgateTypes = [(IgateType, Igate) | UsedIgateTypesRest].
-
-%% % combine igate types for each ogate
-%% combine_igate_types_per_ogate(_, _, OgateNum, OgateNum, []).
-%% combine_igate_types_per_ogate(Module, IgateTypes, Ogate, TotalOgates, IgateTypesPerOgate) :-
-%%     findall(UnusedIgate, no_path(Module, UnusedIgate, Ogate), UnusedIgates),
-%%     filter_unused_igate_types(IgateTypes, UnusedIgates, UsedIgateTypes),
-%%     maplist(flatten_type_and_gate_tuple, UsedIgateTypes, IgateTypesFlattened),
-%%     combine_all_types(IgateTypesFlattened, IgateTypeForOgate),
-%%     NextOgate is Ogate + 1,
-%%     combine_igate_types_per_ogate(Module, IgateTypes, NextOgate, TotalOgates, IgateTypesPerOgateRest),
-%%     IgateTypesPerOgate = [IgateTypeForOgate | IgateTypesPerOgateRest].
 
 flatten_attrs_and_gate_tuple((Attrs, _), Attrs).
 
