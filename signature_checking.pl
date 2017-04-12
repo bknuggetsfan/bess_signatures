@@ -3,7 +3,7 @@
 %                      FRAMEWORK
 % ===================================================================
 
-:-use_module('tests/pipeline_combine_multiple_attrs').
+:-use_module('tests/pipeline_combine_overloaded_igates').
 :-use_module('packet_knowledge_base').
 
 % ==================== UTIlITIES ====================================
@@ -163,6 +163,28 @@ reduced_types(Module, UpstreamTypes, [ReducedType]) :-
 % cascading, etc goes here 
 new_types(Module, _, ModuleTypes) :-
     get_types(Module, output, ModuleTypes).
+
+flatten_type_and_gate_tuple((Type, _), Type).
+
+% combines types in a list reduction-style
+combine_all_types([Type1], Type1).
+combine_all_types([Type1, Type2], CombinedType) :-
+    combine_types(Type1, Type2, CombinedType).
+combine_all_types(Types, CombinedType) :-
+    Types = [Type1, Type2 | RestTypes],
+    RestTypes = [_ | _],
+    combine_types(Type1, Type2, CombinedTypeTemp),
+    combine_all_types([CombinedTypeTemp | RestTypes], CombinedType).
+
+% combine igate types for each ogate
+combine_igate_types_per_ogate(_, OgateNum, OgateNum, []).
+combine_igate_types_per_ogate(IgateTypes, OgateNum, TotalOgates, IgateTypesPerOgate) :-
+    maplist(flatten_type_and_gate_tuple, IgateTypes, IgateTypesFlattened),
+    combine_all_types(IgateTypesFlattened, IgateTypeForOgate),
+    NextOgateNum is OgateNum + 1,
+    combine_igate_types_per_ogate(IgateTypes, NextOgateNum, TotalOgates, IgateTypesPerOgateRest),
+    IgateTypesPerOgate = [IgateTypeForOgate | IgateTypesPerOgateRest].
+    
 
 % ------------------- Attribute Rules -------------------------------
 
@@ -342,11 +364,14 @@ verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     all_attrs_compatible(InputAttrs, AllUpstreamAttrs),
     connection_types_to_gate_types(AllUpstreamTypes, UpstreamTypesPerIgate),
     connection_attrs_to_gate_attrs(AllUpstreamAttrs, UpstreamTypesPerIgate, UpstreamAttrsPerIgate),
-    print(UpstreamAttrsPerIgate),
-    new_types(Module, UpstreamTypes, OutputTypes),
-    new_attrs(Module, UpstreamAttrs, OutputAttrs),
-    append(UpstreamTypes, OutputTypes, UpdatedUpstreamTypes),
-    append(UpstreamAttrs, OutputAttrs, UpdatedUpstreamAttrs),
+    get_flattened_types(Module, output, OutputTypes),
+    length(OutputTypes, NumOgates),
+    combine_igate_types_per_ogate(UpstreamTypesPerIgate, 0, NumOgates, IgateTypesPerOgate),
+    %igate_attrs_to_ogate_attrs(UpstreamAttrsPerIgate, OgateAttrs)
+    new_types(Module, UpstreamTypes, NewOutputTypes),
+    new_attrs(Module, UpstreamAttrs, NewOutputAttrs),
+    append(UpstreamTypes, NewOutputTypes, UpdatedUpstreamTypes),
+    append(UpstreamAttrs, NewOutputAttrs, UpdatedUpstreamAttrs),
     verify_signatures([Module | Explored], UpdatedUpstreamTypes, UpdatedUpstreamAttrs).
 
 

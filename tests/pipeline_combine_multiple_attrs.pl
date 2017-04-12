@@ -49,7 +49,7 @@ signatures(i, [], [Out0]) :-
      Out0 = ([ethernet-[eth_test1-3], ipv4-[checksum-correct], payload], 
             [agnostic_test1-correct, agnostic_test2-3, agnostic_test3-8]).     
 
-signatures(j, [In0, In1, In2, In3], []) :-
+signatures(j, [In0, In1, In2, In3], [Out0, Out1]) :-
     In0 = ([ethernet-[eth_test1-4], ipv4-[checksum-correct, destAddressSet-correct], payload],  
            [agnostic_test1-correct, agnostic_test2-6, agnostic_test3-3]),
     In1 = ([ethernet-[eth_test1-4], ipv4-[checksum-correct, destAddressSet-correct], payload],  
@@ -57,4 +57,8 @@ signatures(j, [In0, In1, In2, In3], []) :-
     In2 = ([ethernet-[eth_test1-5], ipv4-[checksum-incorrect, destAddressSet-incorrect], payload],  
            [agnostic_test1-correct, agnostic_test2-7, agnostic_test3-8]),
     In3 = ([ethernet-[eth_test1-5], ipv4, payload],  
-           [agnostic_test1-correct, agnostic_test3-8]).
+           [agnostic_test1-correct, agnostic_test3-8]),
+    Out0 = ([payload],  
+           [agnostic_test1-correct, agnostic_test2-6, agnostic_test3-3]),
+    Out1 = ([ethernet-[eth_test1-4], ipv4-[checksum-correct, destAddressSet-correct], payload],  
+           [agnostic_test1-correct, agnostic_test2-6, agnostic_test3-3]).
