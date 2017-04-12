@@ -13,19 +13,19 @@ connected(d, 1, e, 2).
 
 % signatures(Module name, Input sigs, Output sigs)
 signatures(a, [], [Out0, Out1]) :-
-    Out0 = ([ethernet-[eth_test1-1], ipv4, payload], []),
-    Out1 = ([ethernet, ipv4, payload], [agnostic_test3-1]).
+    Out0 = ([ethernet-[eth_test1-1], ipv4, payload], [agnostic_test1-correct, agnostic_test2-1, agnostic_test3-1]),
+    Out1 = ([ethernet-[eth_test1-2], ipv4, payload], [agnostic_test1-incorrect, agnostic_test2-4, agnostic_test3-1]).
 
 signatures(b, [], [Out0, Out1]) :-
-    Out0 = ([ethernet-[eth_test1-2], ip, payload], []),
-    Out1 = ([ethernet, ipv6, payload], [agnostic_test3-1]).
+    Out0 = ([ethernet-[eth_test1-2], ipv4, payload], [agnostic_test1-correct, agnostic_test2-2, agnostic_test3-1]),
+    Out1 = ([ethernet-[eth_test1-2], ipv6, payload], [agnostic_test1-incorrect, agnostic_test2-3, agnostic_test3-1]).
 
 signatures(c, [], [Out0]) :-
-    Out0 = ([ethernet-[eth_test1-3], ip, payload], []).
+    Out0 = ([ethernet-[eth_test1-2], ip, payload], [agnostic_test1-correct, agnostic_test2-3, agnostic_test3-1]).
 
 signatures(d, [], [Out0, Out1]) :-
-    Out0 = ([ethernet-[eth_test1-3], ipv6, payload], []),
-    Out1 = ([ethernet-[eth_test1-3], ipv6, payload], []).
+    Out0 = ([ethernet-[eth_test1-0], ipv6, payload], [agnostic_test3-1]),
+    Out1 = ([ethernet-[eth_test1-0], ipv6, payload], [agnostic_test3-1]).
 
 signatures(e, [In0, In1, In2], [Out0, Out1, Out2]) :-
     In0 = ([ethernet-[eth_test1-4], ip, payload], []),
@@ -37,6 +37,5 @@ signatures(e, [In0, In1, In2], [Out0, Out1, Out2]) :-
 
 % no_path(module, igate, ogate)
 no_path(e, 2, 1).
-no_path(e, 0, 1).
 no_path(e, 1, 2).
 no_path(e, 0, 2).

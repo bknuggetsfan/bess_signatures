@@ -345,6 +345,54 @@ connection_attrs_to_gate_attrs(AllConnectionAttrs, GateTypes, GateAttrs) :-
     GateAttrs = [(AllAttrsForGate, GateIndex) | GateAttrsRest].
 
 
+%% % combines types in a list reduction-style
+%% combine_all_types([Type1], Type1).
+%% combine_all_types([Type1, Type2], CombinedType) :-
+%%     combine_types(Type1, Type2, CombinedType).
+%% combine_all_types(Types, CombinedType) :-
+%%     Types = [Type1, Type2 | RestTypes],
+%%     RestTypes = [_ | _],
+%%     combine_types(Type1, Type2, CombinedTypeTemp),
+%%     combine_all_types([CombinedTypeTemp | RestTypes], CombinedType).
+
+
+%% filter_unused_igate_types([], _, []).
+%% filter_unused_igate_types(IgateTypes, UnusedIgates, UsedIgateTypes) :-
+%%     IgateTypes = [(_, Igate) | IgateTypesRest],
+%%     memberchk(Igate, UnusedIgates), 
+%%     filter_unused_igate_types(IgateTypesRest, UnusedIgates, UsedIgateTypes).
+%% filter_unused_igate_types(IgateTypes, UnusedIgates, UsedIgateTypes) :-
+%%     IgateTypes = [(IgateType, Igate) | IgateTypesRest],
+%%     filter_unused_igate_types(IgateTypesRest, UnusedIgates, UsedIgateTypesRest),
+%%     UsedIgateTypes = [(IgateType, Igate) | UsedIgateTypesRest].
+
+%% % combine igate types for each ogate
+%% combine_igate_types_per_ogate(_, _, OgateNum, OgateNum, []).
+%% combine_igate_types_per_ogate(Module, IgateTypes, Ogate, TotalOgates, IgateTypesPerOgate) :-
+%%     findall(UnusedIgate, no_path(Module, UnusedIgate, Ogate), UnusedIgates),
+%%     filter_unused_igate_types(IgateTypes, UnusedIgates, UsedIgateTypes),
+%%     maplist(flatten_type_and_gate_tuple, UsedIgateTypes, IgateTypesFlattened),
+%%     combine_all_types(IgateTypesFlattened, IgateTypeForOgate),
+%%     NextOgate is Ogate + 1,
+%%     combine_igate_types_per_ogate(Module, IgateTypes, NextOgate, TotalOgates, IgateTypesPerOgateRest),
+%%     IgateTypesPerOgate = [IgateTypeForOgate | IgateTypesPerOgateRest].
+
+flatten_attrs_and_gate_tuple((Attrs, _), Attrs).
+
+
+combine_igate_attrs_per_ogate(_, _, _, NumOgates, NumOgates, []).
+combine_igate_attrs_per_ogate(Module, OgateTypes, IgateAttrs, Ogate, NumOgates, IgateAttrsPerOgate) :-
+    findall(UnusedIgate, no_path(Module, UnusedIgate, Ogate), UnusedIgates),
+    nth0(Ogate, OgateTypes, OgateType),
+    filter_unused_igate_types(IgateAttrs, UnusedIgates, UsedIgateAttrs),
+    maplist(flatten_attrs_and_gate_tuple, UsedIgateAttrs, IgateAttrsFlattened),
+    length(IgateAttrsFlattened, NumIgates),
+    gate_protocol_attrs(IgateAttrsFlattened, OgateType, ProtAttrsForGate, NumIgates),
+    gate_agnostic_attrs(IgateAttrsFlattened, AgnosticAttrsForGate, NumIgates),
+    append(ProtAttrsForGate, AgnosticAttrsForGate, AllAttrsForOgate),
+    NextOgate is Ogate + 1,
+    combine_igate_attrs_per_ogate(Module, OgateTypes, IgateAttrs, NextOgate, NumOgates, IgateAttrsPerOgateRest),
+    IgateAttrsPerOgate = [AllAttrsForOgate | IgateAttrsPerOgateRest].
 
 % ------------------- Signature Checking ----------------------------
 
@@ -381,6 +429,7 @@ verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     get_flattened_types(Module, output, OutputTypes),
     length(OutputTypes, NumOgates),
     combine_igate_types_per_ogate(Module, UpstreamTypesPerIgate, 0, NumOgates, IgateTypesPerOgate),
+    combine_igate_attrs_per_ogate(Module, IgateTypesPerOgate, UpstreamAttrsPerIgate, 0, NumOgates, IgateAttrsPerOgate),
     new_types(Module, UpstreamTypes, NewOutputTypes),
     new_attrs(Module, UpstreamAttrs, NewOutputAttrs),
     append(UpstreamTypes, NewOutputTypes, UpdatedUpstreamTypes),
