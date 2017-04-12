@@ -1,5 +1,5 @@
 
-:- module(pipeline_combine_overloaded_igates, [connected/4, signatures/3]).
+:- module(pipeline_combine_overloaded_igates, [connected/4, signatures/3, no_path/3]).
 
 % connected(Upstream Module, OGate, Downstream Module, IGate)
 connected(a, 0, e, 0).
@@ -27,9 +27,16 @@ signatures(d, [], [Out0, Out1]) :-
     Out0 = ([ethernet-[eth_test1-3], ipv6, payload], []),
     Out1 = ([ethernet-[eth_test1-3], ipv6, payload], []).
 
-signatures(e, [In0, In1, In2], [Out0, Out1]) :-
+signatures(e, [In0, In1, In2], [Out0, Out1, Out2]) :-
     In0 = ([ethernet-[eth_test1-4], ip, payload], []),
     In1 =([payload], [agnostic_test3-1]),
     In2 = ([payload], []),
     Out0 = ([payload], []),
-    Out1 = ([payload], []).
+    Out1 = ([payload], []),
+    Out2 = ([payload], []).
+
+%no_path(module, igate, ogate)
+no_path(e, 2, 1).
+no_path(e, 0, 1).
+no_path(e, 1, 2).
+no_path(e, 0, 2).

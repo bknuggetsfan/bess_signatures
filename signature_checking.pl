@@ -176,13 +176,26 @@ combine_all_types(Types, CombinedType) :-
     combine_types(Type1, Type2, CombinedTypeTemp),
     combine_all_types([CombinedTypeTemp | RestTypes], CombinedType).
 
+
+filter_unused_igate_types([], _, []).
+filter_unused_igate_types(IgateTypes, UnusedIgates, UsedIgateTypes) :-
+    IgateTypes = [(_, Igate) | IgateTypesRest],
+    memberchk(Igate, UnusedIgates), 
+    filter_unused_igate_types(IgateTypesRest, UnusedIgates, UsedIgateTypes).
+filter_unused_igate_types(IgateTypes, UnusedIgates, UsedIgateTypes) :-
+    IgateTypes = [(IgateType, Igate) | IgateTypesRest],
+    filter_unused_igate_types(IgateTypesRest, UnusedIgates, UsedIgateTypesRest),
+    UsedIgateTypes = [(IgateType, Igate) | UsedIgateTypesRest].
+
 % combine igate types for each ogate
-combine_igate_types_per_ogate(_, OgateNum, OgateNum, []).
-combine_igate_types_per_ogate(IgateTypes, OgateNum, TotalOgates, IgateTypesPerOgate) :-
-    maplist(flatten_type_and_gate_tuple, IgateTypes, IgateTypesFlattened),
+combine_igate_types_per_ogate(_, _, OgateNum, OgateNum, []).
+combine_igate_types_per_ogate(Module, IgateTypes, Ogate, TotalOgates, IgateTypesPerOgate) :-
+    findall(UnusedIgate, no_path(Module, UnusedIgate, Ogate), UnusedIgates),
+    filter_unused_igate_types(IgateTypes, UnusedIgates, UsedIgateTypes),
+    maplist(flatten_type_and_gate_tuple, UsedIgateTypes, IgateTypesFlattened),
     combine_all_types(IgateTypesFlattened, IgateTypeForOgate),
-    NextOgateNum is OgateNum + 1,
-    combine_igate_types_per_ogate(IgateTypes, NextOgateNum, TotalOgates, IgateTypesPerOgateRest),
+    NextOgate is Ogate + 1,
+    combine_igate_types_per_ogate(Module, IgateTypes, NextOgate, TotalOgates, IgateTypesPerOgateRest),
     IgateTypesPerOgate = [IgateTypeForOgate | IgateTypesPerOgateRest].
     
 
@@ -366,8 +379,7 @@ verify_signatures(Explored, UpstreamTypes, UpstreamAttrs) :-
     connection_attrs_to_gate_attrs(AllUpstreamAttrs, UpstreamTypesPerIgate, UpstreamAttrsPerIgate),
     get_flattened_types(Module, output, OutputTypes),
     length(OutputTypes, NumOgates),
-    combine_igate_types_per_ogate(UpstreamTypesPerIgate, 0, NumOgates, IgateTypesPerOgate),
-    %igate_attrs_to_ogate_attrs(UpstreamAttrsPerIgate, OgateAttrs)
+    combine_igate_types_per_ogate(Module, UpstreamTypesPerIgate, 0, NumOgates, IgateTypesPerOgate),
     new_types(Module, UpstreamTypes, NewOutputTypes),
     new_attrs(Module, UpstreamAttrs, NewOutputAttrs),
     append(UpstreamTypes, NewOutputTypes, UpdatedUpstreamTypes),
